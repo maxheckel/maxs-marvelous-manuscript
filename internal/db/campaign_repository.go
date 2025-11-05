@@ -75,34 +75,30 @@ func (r *CampaignRepository) List() ([]*models.Campaign, error) {
 
 // Update updates a campaign
 func (r *CampaignRepository) Update(id int64, params models.UpdateCampaignParams) error {
-	columns := ColumnList{}
-	values := make(map[Column]interface{})
+	stmt := Campaigns.UPDATE().
+		SET(Campaigns.UpdatedAt.SET(CURRENT_TIMESTAMP()))
 
 	if params.Name != nil {
-		columns = append(columns, Campaigns.Name)
-		values[Campaigns.Name] = *params.Name
+		stmt = stmt.SET(Campaigns.Name.SET(String(*params.Name)))
 	}
 	if params.Description != nil {
-		columns = append(columns, Campaigns.Description)
-		values[Campaigns.Description] = params.Description
+		stmt = stmt.SET(Campaigns.Description.SET(String(*params.Description)))
 	}
 
-	if len(columns) == 0 {
-		return fmt.Errorf("no fields to update")
-	}
+	stmt = stmt.WHERE(Campaigns.ID.EQ(Int32(int32(id))))
 
-	// Always update the updated_at timestamp
-	columns = append(columns, Campaigns.UpdatedAt)
-	values[Campaigns.UpdatedAt] = CURRENT_TIMESTAMP()
-
-	stmt := Campaigns.
-		UPDATE(columns).
-		MODEL(values).
-		WHERE(Campaigns.ID.EQ(Int32(int32(id))))
-
-	_, err := stmt.Exec(r.db.DB)
+	result, err := stmt.Exec(r.db.DB)
 	if err != nil {
 		return fmt.Errorf("failed to update campaign: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("campaign not found")
 	}
 
 	return nil

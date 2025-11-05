@@ -99,43 +99,38 @@ func (r *SessionRepository) List() ([]*models.Session, error) {
 
 // Update updates a session
 func (r *SessionRepository) Update(id int64, params models.UpdateSessionParams) error {
-	columns := ColumnList{}
-	values := make(map[Column]interface{})
+	stmt := Sessions.UPDATE().
+		SET(Sessions.UpdatedAt.SET(CURRENT_TIMESTAMP()))
 
 	if params.Name != nil {
-		columns = append(columns, Sessions.Name)
-		values[Sessions.Name] = *params.Name
+		stmt = stmt.SET(Sessions.Name.SET(String(*params.Name)))
 	}
 	if params.SessionNumber != nil {
 		sessionNumber := int32(*params.SessionNumber)
-		columns = append(columns, Sessions.SessionNumber)
-		values[Sessions.SessionNumber] = sessionNumber
+		stmt = stmt.SET(Sessions.SessionNumber.SET(Int32(sessionNumber)))
 	}
 	if params.SessionDate != nil {
-		columns = append(columns, Sessions.SessionDate)
-		values[Sessions.SessionDate] = params.SessionDate
+		dateStr := params.SessionDate.Format("2006-01-02")
+		stmt = stmt.SET(Sessions.SessionDate.SET(RawDate(":date", map[string]interface{}{"date": dateStr})))
 	}
 	if params.Notes != nil {
-		columns = append(columns, Sessions.Notes)
-		values[Sessions.Notes] = params.Notes
+		stmt = stmt.SET(Sessions.Notes.SET(String(*params.Notes)))
 	}
 
-	if len(columns) == 0 {
-		return fmt.Errorf("no fields to update")
-	}
+	stmt = stmt.WHERE(Sessions.ID.EQ(Int32(int32(id))))
 
-	// Always update the updated_at timestamp
-	columns = append(columns, Sessions.UpdatedAt)
-	values[Sessions.UpdatedAt] = CURRENT_TIMESTAMP()
-
-	stmt := Sessions.
-		UPDATE(columns).
-		MODEL(values).
-		WHERE(Sessions.ID.EQ(Int32(int32(id))))
-
-	_, err := stmt.Exec(r.db.DB)
+	result, err := stmt.Exec(r.db.DB)
 	if err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("session not found")
 	}
 
 	return nil

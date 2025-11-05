@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gen2brain/malgo"
 	"github.com/google/uuid"
 	"github.com/maxheckel/maxs-marvelous-manuscript/internal/db"
 	"github.com/maxheckel/maxs-marvelous-manuscript/pkg/models"
@@ -68,6 +69,9 @@ type Recorder struct {
 	mu           sync.RWMutex
 	stopChan     chan struct{}
 	audioBuffer  []byte
+	malgoCtx     *malgo.AllocatedContext
+	malgoDevice  *malgo.Device
+	captureWg    sync.WaitGroup
 }
 
 // Config holds recorder configuration
@@ -138,7 +142,11 @@ func (r *Recorder) Start() error {
 	r.state = StateRecording
 
 	// Start audio capture in a goroutine
-	go r.captureAudio()
+	r.captureWg.Add(1)
+	go func() {
+		defer r.captureWg.Done()
+		r.captureAudio()
+	}()
 
 	return nil
 }
@@ -182,6 +190,11 @@ func (r *Recorder) Stop() error {
 
 	// Signal the audio capture to stop
 	close(r.stopChan)
+
+	// Release lock while waiting for capture to finish
+	r.mu.Unlock()
+	r.captureWg.Wait()
+	r.mu.Lock()
 
 	// Calculate final duration and file size
 	duration := time.Since(r.startTime) - r.pausedTotal
@@ -239,29 +252,68 @@ func (r *Recorder) GetDuration() time.Duration {
 	return elapsed
 }
 
-// captureAudio captures audio from the microphone
+// captureAudio captures audio from the microphone using malgo
 func (r *Recorder) captureAudio() {
-	// TODO: Implement actual audio capture using portaudio or malgo
-	// For now, this is a placeholder
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
+	// Initialize malgo context
+	ctx, err := malgo.InitContext(nil, malgo.ContextConfig{}, nil)
+	if err != nil {
+		fmt.Printf("Failed to initialize malgo context: %v\n", err)
+		return
+	}
+	r.malgoCtx = ctx
+	defer func() {
+		_ = ctx.Uninit()
+		ctx.Free()
+	}()
 
-	for {
-		select {
-		case <-r.stopChan:
-			return
-		case <-ticker.C:
-			r.mu.RLock()
-			state := r.state
-			r.mu.RUnlock()
+	// Configure capture device
+	deviceConfig := malgo.DefaultDeviceConfig(malgo.Capture)
+	deviceConfig.Capture.Format = malgo.FormatS16
+	deviceConfig.Capture.Channels = uint32(r.format.Channels)
+	deviceConfig.SampleRate = uint32(r.format.SampleRate)
+	deviceConfig.Alsa.NoMMap = 1
 
-			if state == StateRecording {
-				// TODO: Capture and write audio data
-				// This would involve:
-				// 1. Reading from audio input device
-				// 2. Writing PCM data to file
+	// Data callback - called when audio data is available
+	onRecvFrames := func(pSample2, pSample []byte, framecount uint32) {
+		r.mu.RLock()
+		state := r.state
+		file := r.currentFile
+		r.mu.RUnlock()
+
+		// Only write if we're actively recording (not paused)
+		if state == StateRecording && file != nil {
+			_, err := file.Write(pSample)
+			if err != nil {
+				fmt.Printf("Failed to write audio data: %v\n", err)
 			}
 		}
+	}
+
+	// Initialize the device
+	device, err := malgo.InitDevice(ctx.Context, deviceConfig, malgo.DeviceCallbacks{
+		Data: onRecvFrames,
+	})
+	if err != nil {
+		fmt.Printf("Failed to initialize capture device: %v\n", err)
+		return
+	}
+	r.malgoDevice = device
+	defer device.Uninit()
+
+	// Start the device
+	err = device.Start()
+	if err != nil {
+		fmt.Printf("Failed to start capture device: %v\n", err)
+		return
+	}
+
+	// Wait for stop signal
+	<-r.stopChan
+
+	// Stop the device
+	err = device.Stop()
+	if err != nil {
+		fmt.Printf("Failed to stop capture device: %v\n", err)
 	}
 }
 

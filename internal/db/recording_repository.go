@@ -98,53 +98,49 @@ func (r *RecordingRepository) List() ([]*models.Recording, error) {
 
 // Update updates a recording
 func (r *RecordingRepository) Update(id int64, params models.UpdateRecordingParams) error {
-	columns := ColumnList{}
-	values := make(map[Column]interface{})
+	stmt := Recordings.UPDATE()
 
 	if params.SessionID != nil {
 		sessionID := int32(*params.SessionID)
-		columns = append(columns, Recordings.SessionID)
-		values[Recordings.SessionID] = &sessionID
+		stmt = stmt.SET(Recordings.SessionID.SET(Int32(sessionID)))
 	}
 	if params.DurationSeconds != nil {
 		duration := int32(*params.DurationSeconds)
-		columns = append(columns, Recordings.DurationSeconds)
-		values[Recordings.DurationSeconds] = &duration
+		stmt = stmt.SET(Recordings.DurationSeconds.SET(Int32(duration)))
 	}
 	if params.FileSizeBytes != nil {
 		fileSize := int32(*params.FileSizeBytes)
-		columns = append(columns, Recordings.FileSizeBytes)
-		values[Recordings.FileSizeBytes] = &fileSize
+		stmt = stmt.SET(Recordings.FileSizeBytes.SET(Int32(fileSize)))
 	}
 	if params.Status != nil {
-		columns = append(columns, Recordings.Status)
-		values[Recordings.Status] = *params.Status
+		stmt = stmt.SET(Recordings.Status.SET(String(*params.Status)))
 	}
 	if params.CompletedAt != nil {
-		columns = append(columns, Recordings.CompletedAt)
-		values[Recordings.CompletedAt] = params.CompletedAt
+		// Format time as SQLite expects it
+		timeStr := params.CompletedAt.Format("2006-01-02 15:04:05")
+		stmt = stmt.SET(Recordings.CompletedAt.SET(RawTimestamp(":time", map[string]interface{}{"time": timeStr})))
 	}
 	if params.TranscriptionStatus != nil {
-		columns = append(columns, Recordings.TranscriptionStatus)
-		values[Recordings.TranscriptionStatus] = params.TranscriptionStatus
+		stmt = stmt.SET(Recordings.TranscriptionStatus.SET(String(*params.TranscriptionStatus)))
 	}
 	if params.Notes != nil {
-		columns = append(columns, Recordings.Notes)
-		values[Recordings.Notes] = params.Notes
+		stmt = stmt.SET(Recordings.Notes.SET(String(*params.Notes)))
 	}
 
-	if len(columns) == 0 {
-		return fmt.Errorf("no fields to update")
-	}
+	stmt = stmt.WHERE(Recordings.ID.EQ(Int32(int32(id))))
 
-	stmt := Recordings.
-		UPDATE(columns).
-		MODEL(values).
-		WHERE(Recordings.ID.EQ(Int32(int32(id))))
-
-	_, err := stmt.Exec(r.db.DB)
+	result, err := stmt.Exec(r.db.DB)
 	if err != nil {
 		return fmt.Errorf("failed to update recording: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("recording not found")
 	}
 
 	return nil

@@ -3,6 +3,7 @@ module github.com/maxheckel/maxs-marvelous-manuscript
 go 1.25.1
 
 require (
+	github.com/gen2brain/malgo v0.11.24
 	github.com/go-jet/jet/v2 v2.14.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1

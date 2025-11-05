@@ -91,34 +91,32 @@ func (r *PlayerRepository) List() ([]*models.Player, error) {
 
 // Update updates a player
 func (r *PlayerRepository) Update(id int64, params models.UpdatePlayerParams) error {
-	columns := ColumnList{}
-	values := make(map[Column]interface{})
+	stmt := Players.UPDATE()
 
 	if params.Name != nil {
-		columns = append(columns, Players.Name)
-		values[Players.Name] = *params.Name
+		stmt = stmt.SET(Players.Name.SET(String(*params.Name)))
 	}
 	if params.Email != nil {
-		columns = append(columns, Players.Email)
-		values[Players.Email] = params.Email
+		stmt = stmt.SET(Players.Email.SET(String(*params.Email)))
 	}
 	if params.CharacterName != nil {
-		columns = append(columns, Players.CharacterName)
-		values[Players.CharacterName] = params.CharacterName
+		stmt = stmt.SET(Players.CharacterName.SET(String(*params.CharacterName)))
 	}
 
-	if len(columns) == 0 {
-		return fmt.Errorf("no fields to update")
-	}
+	stmt = stmt.WHERE(Players.ID.EQ(Int32(int32(id))))
 
-	stmt := Players.
-		UPDATE(columns).
-		MODEL(values).
-		WHERE(Players.ID.EQ(Int32(int32(id))))
-
-	_, err := stmt.Exec(r.db.DB)
+	result, err := stmt.Exec(r.db.DB)
 	if err != nil {
 		return fmt.Errorf("failed to update player: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("player not found")
 	}
 
 	return nil

@@ -167,10 +167,13 @@ export AUDIO_BIT_DEPTH="16"           # 16-bit
 
 ### Audio Recording
 
-- Optimized for long sessions (4+ hours)
-- Low quality audio (16kHz, mono, 16-bit) to reduce file size
-- WAV format for simplicity and compatibility
-- Pause/resume functionality (planned)
+- **Real-time audio capture** using malgo (mini audio Go bindings)
+- **Optimized for long sessions** (4+ hours)
+- **Low quality audio** (16kHz, mono, 16-bit) to reduce file size
+  - Approximately 115 MB per hour of recording
+- **WAV format** for simplicity and compatibility
+- **Pause/resume functionality** - pause recording without stopping
+- **Cross-platform** - works on macOS, Linux, Windows, and Raspberry Pi
 
 ### AI Services (Interfaces)
 
@@ -235,17 +238,26 @@ This will:
 
 ## Roadmap
 
-- [ ] Implement actual audio capture (currently a stub)
-- [ ] Add pause/resume to recorder
+### Completed ✅
+- [x] Real-time audio capture with malgo
+- [x] Pause/resume functionality
+- [x] Campaign and session management
+- [x] Player tracking and attendance
+- [x] Type-safe database queries with Jet
+
+### In Progress 🚧
 - [ ] Implement OpenAI Whisper transcription
 - [ ] Add speaker diarization
 - [ ] Implement AI summarization
+
+### Planned 📋
 - [ ] Add embedding generation and semantic search
 - [ ] Session comparison and analysis
 - [ ] Export session notes and summaries
-- [ ] Support for multiple campaigns
 - [ ] Character and NPC tracking
 - [ ] Timeline visualization
+- [ ] Web UI for campaigns and sessions
+- [ ] API endpoints for all resources
 
 ## Contributing
 
@@ -257,7 +269,9 @@ This is a personal project, but suggestions and contributions are welcome!
 
 ## Notes
 
-- Audio files can get large for long sessions. A 4-hour session at these settings is approximately 460 MB.
-- The recorder currently uses a placeholder for actual audio capture. You'll need to integrate a library like `portaudio` or `malgo` for real audio recording.
+- Audio files are optimized for long sessions: approximately **115 MB per hour** at 16kHz, mono, 16-bit.
+- **Audio recording is fully implemented** using malgo for cross-platform capture.
+- Ensure your system has a working microphone/audio input device.
 - AI features require API keys and may incur costs (OpenAI API).
 - This runs entirely locally except for AI API calls.
+- The recorder writes WAV files directly - no encoding overhead during recording.
