@@ -155,8 +155,15 @@ export AUDIO_BIT_DEPTH="16"           # 16-bit
 
 - **SQLite** database stored locally
 - **Migrations** managed with sql-migrate
+- **Query Builder** using go-jet/jet for type-safe SQL queries
 - **Repository pattern** for data access
-- Table: `recordings` - stores metadata about each session
+- Tables:
+  - `campaigns` - D&D campaigns
+  - `sessions` - Individual game sessions within campaigns
+  - `recordings` - Audio recordings for sessions
+  - `players` - Player information
+  - `campaign_players` - Many-to-many relationship between campaigns and players
+  - `session_players` - Session attendance tracking
 
 ### Audio Recording
 
@@ -215,6 +222,16 @@ CREATE TABLE ...;
 -- +migrate Down
 DROP TABLE ...;
 ```
+
+3. After creating a migration, regenerate Jet models:
+
+```bash
+make generate-jet
+```
+
+This will:
+- Create a temporary database with the new schema
+- Generate type-safe Go models and query builders in `internal/db/gen/`
 
 ## Roadmap
 

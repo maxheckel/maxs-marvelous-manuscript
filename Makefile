@@ -1,4 +1,4 @@
-.PHONY: all build clean run-recorder run-web dev install-frontend build-frontend test
+.PHONY: all build clean run-recorder run-web dev install-frontend build-frontend test generate-jet
 
 # Build everything
 all: build build-frontend
@@ -74,6 +74,13 @@ init:
 	@mkdir -p data
 	@echo "Data directory created!"
 
+# Generate Jet models from database schema
+generate-jet:
+	@echo "Generating Jet models from schema..."
+	@./scripts/generate_schema.sh
+	@jet -source=sqlite -dsn="file://$(shell pwd)/data/temp_schema.db" -path=./internal/db/gen
+	@echo "Jet models generated!"
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -90,4 +97,5 @@ help:
 	@echo "  make fmt             - Format Go code"
 	@echo "  make lint            - Lint Go code"
 	@echo "  make init            - Create data directory"
+	@echo "  make generate-jet    - Generate Jet models from schema"
 	@echo "  make help            - Show this help"

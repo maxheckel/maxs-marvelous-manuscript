@@ -83,11 +83,12 @@ func main() {
 
 	// Start server
 	addr := fmt.Sprintf(":%s", port)
+	absDataDir, _ := filepath.Abs(dataDir)
 	fmt.Printf("🚀 D&D Session Assistant API\n")
 	fmt.Printf("========================\n\n")
 	fmt.Printf("Server starting on http://localhost%s\n", addr)
 	fmt.Printf("API available at http://localhost%s/api\n", addr)
-	fmt.Printf("Data directory: %s\n\n", filepath.Abs(dataDir))
+	fmt.Printf("Data directory: %s\n\n", absDataDir)
 
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("Server failed: %v", err)

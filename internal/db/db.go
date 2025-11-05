@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/maxheckel/maxs-marvelous-manuscript/migrations"
 	_ "github.com/mattn/go-sqlite3"
 	migrate "github.com/rubenv/sql-migrate"
 )
@@ -48,9 +49,9 @@ func New(cfg Config) (*DB, error) {
 
 // Migrate runs all pending migrations
 func (db *DB) Migrate() error {
-	migrations := GetMigrations()
+	migrationSource := migrations.GetMigrations()
 
-	n, err := migrate.Exec(db.DB, "sqlite3", migrations, migrate.Up)
+	n, err := migrate.Exec(db.DB, "sqlite3", migrationSource, migrate.Up)
 	if err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}

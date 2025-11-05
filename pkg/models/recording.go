@@ -4,6 +4,7 @@ import "time"
 
 type Recording struct {
 	ID                   int64      `json:"id"`
+	SessionID            *int64     `json:"session_id,omitempty"`
 	FileID               string     `json:"file_id"`
 	Filename             string     `json:"filename"`
 	FilePath             string     `json:"file_path"`
@@ -17,12 +18,14 @@ type Recording struct {
 }
 
 type CreateRecordingParams struct {
-	FileID   string
-	Filename string
-	FilePath string
+	SessionID *int64
+	FileID    string
+	Filename  string
+	FilePath  string
 }
 
 type UpdateRecordingParams struct {
+	SessionID           *int64
 	DurationSeconds     *int
 	FileSizeBytes       *int64
 	Status              *string

@@ -1,10 +1,12 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 
+	. "github.com/go-jet/jet/v2/sqlite"
+	"github.com/maxheckel/maxs-marvelous-manuscript/internal/db/gen/model"
+	. "github.com/maxheckel/maxs-marvelous-manuscript/internal/db/gen/table"
 	"github.com/maxheckel/maxs-marvelous-manuscript/pkg/models"
 )
 
@@ -18,180 +20,77 @@ func NewRecordingRepository(db *DB) *RecordingRepository {
 
 // Create creates a new recording
 func (r *RecordingRepository) Create(params models.CreateRecordingParams) (*models.Recording, error) {
-	query := `
-		INSERT INTO recordings (file_id, filename, file_path, status, created_at)
-		VALUES (?, ?, ?, 'recording', CURRENT_TIMESTAMP)
-		RETURNING id, file_id, filename, file_path, duration_seconds, file_size_bytes,
-		          status, created_at, completed_at, transcription_status, notes
-	`
+	jetModel := model.Recordings{
+		FileID:   params.FileID,
+		Filename: params.Filename,
+		FilePath: params.FilePath,
+		Status:   "recording",
+	}
 
-	var rec models.Recording
-	var completedAt sql.NullTime
-	var notes sql.NullString
+	if params.SessionID != nil {
+		sessionID := int32(*params.SessionID)
+		jetModel.SessionID = &sessionID
+	}
 
-	err := r.db.QueryRow(query, params.FileID, params.Filename, params.FilePath).Scan(
-		&rec.ID,
-		&rec.FileID,
-		&rec.Filename,
-		&rec.FilePath,
-		&rec.DurationSeconds,
-		&rec.FileSizeBytes,
-		&rec.Status,
-		&rec.CreatedAt,
-		&completedAt,
-		&rec.TranscriptionStatus,
-		&notes,
-	)
+	stmt := Recordings.
+		INSERT(Recordings.MutableColumns).
+		MODEL(jetModel).
+		RETURNING(Recordings.AllColumns)
+
+	var dest model.Recordings
+	err := stmt.Query(r.db.DB, &dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create recording: %w", err)
 	}
 
-	if completedAt.Valid {
-		rec.CompletedAt = &completedAt.Time
-	}
-	if notes.Valid {
-		rec.Notes = &notes.String
-	}
-
-	return &rec, nil
+	return jetModelToRecording(&dest), nil
 }
 
 // GetByID retrieves a recording by ID
 func (r *RecordingRepository) GetByID(id int64) (*models.Recording, error) {
-	query := `
-		SELECT id, file_id, filename, file_path, duration_seconds, file_size_bytes,
-		       status, created_at, completed_at, transcription_status, notes
-		FROM recordings
-		WHERE id = ?
-	`
+	stmt := SELECT(Recordings.AllColumns).
+		FROM(Recordings).
+		WHERE(Recordings.ID.EQ(Int32(int32(id))))
 
-	var rec models.Recording
-	var completedAt sql.NullTime
-	var notes sql.NullString
-
-	err := r.db.QueryRow(query, id).Scan(
-		&rec.ID,
-		&rec.FileID,
-		&rec.Filename,
-		&rec.FilePath,
-		&rec.DurationSeconds,
-		&rec.FileSizeBytes,
-		&rec.Status,
-		&rec.CreatedAt,
-		&completedAt,
-		&rec.TranscriptionStatus,
-		&notes,
-	)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("recording not found")
-	}
+	var dest model.Recordings
+	err := stmt.Query(r.db.DB, &dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recording: %w", err)
 	}
 
-	if completedAt.Valid {
-		rec.CompletedAt = &completedAt.Time
-	}
-	if notes.Valid {
-		rec.Notes = &notes.String
-	}
-
-	return &rec, nil
+	return jetModelToRecording(&dest), nil
 }
 
 // GetByFileID retrieves a recording by file ID
 func (r *RecordingRepository) GetByFileID(fileID string) (*models.Recording, error) {
-	query := `
-		SELECT id, file_id, filename, file_path, duration_seconds, file_size_bytes,
-		       status, created_at, completed_at, transcription_status, notes
-		FROM recordings
-		WHERE file_id = ?
-	`
+	stmt := SELECT(Recordings.AllColumns).
+		FROM(Recordings).
+		WHERE(Recordings.FileID.EQ(String(fileID)))
 
-	var rec models.Recording
-	var completedAt sql.NullTime
-	var notes sql.NullString
-
-	err := r.db.QueryRow(query, fileID).Scan(
-		&rec.ID,
-		&rec.FileID,
-		&rec.Filename,
-		&rec.FilePath,
-		&rec.DurationSeconds,
-		&rec.FileSizeBytes,
-		&rec.Status,
-		&rec.CreatedAt,
-		&completedAt,
-		&rec.TranscriptionStatus,
-		&notes,
-	)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("recording not found")
-	}
+	var dest model.Recordings
+	err := stmt.Query(r.db.DB, &dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recording: %w", err)
 	}
 
-	if completedAt.Valid {
-		rec.CompletedAt = &completedAt.Time
-	}
-	if notes.Valid {
-		rec.Notes = &notes.String
-	}
-
-	return &rec, nil
+	return jetModelToRecording(&dest), nil
 }
 
 // List retrieves all recordings
 func (r *RecordingRepository) List() ([]*models.Recording, error) {
-	query := `
-		SELECT id, file_id, filename, file_path, duration_seconds, file_size_bytes,
-		       status, created_at, completed_at, transcription_status, notes
-		FROM recordings
-		ORDER BY created_at DESC
-	`
+	stmt := SELECT(Recordings.AllColumns).
+		FROM(Recordings).
+		ORDER_BY(Recordings.CreatedAt.DESC())
 
-	rows, err := r.db.Query(query)
+	var dest []model.Recordings
+	err := stmt.Query(r.db.DB, &dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recordings: %w", err)
 	}
-	defer rows.Close()
 
-	var recordings []*models.Recording
-	for rows.Next() {
-		var rec models.Recording
-		var completedAt sql.NullTime
-		var notes sql.NullString
-
-		err := rows.Scan(
-			&rec.ID,
-			&rec.FileID,
-			&rec.Filename,
-			&rec.FilePath,
-			&rec.DurationSeconds,
-			&rec.FileSizeBytes,
-			&rec.Status,
-			&rec.CreatedAt,
-			&completedAt,
-			&rec.TranscriptionStatus,
-			&notes,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan recording: %w", err)
-		}
-
-		if completedAt.Valid {
-			rec.CompletedAt = &completedAt.Time
-		}
-		if notes.Valid {
-			rec.Notes = &notes.String
-		}
-
-		recordings = append(recordings, &rec)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating recordings: %w", err)
+	recordings := make([]*models.Recording, len(dest))
+	for i, d := range dest {
+		recordings[i] = jetModelToRecording(&d)
 	}
 
 	return recordings, nil
@@ -199,59 +98,53 @@ func (r *RecordingRepository) List() ([]*models.Recording, error) {
 
 // Update updates a recording
 func (r *RecordingRepository) Update(id int64, params models.UpdateRecordingParams) error {
-	// Build dynamic update query
-	query := "UPDATE recordings SET "
-	args := []interface{}{}
-	updates := []string{}
+	columns := ColumnList{}
+	values := make(map[Column]interface{})
 
+	if params.SessionID != nil {
+		sessionID := int32(*params.SessionID)
+		columns = append(columns, Recordings.SessionID)
+		values[Recordings.SessionID] = &sessionID
+	}
 	if params.DurationSeconds != nil {
-		updates = append(updates, "duration_seconds = ?")
-		args = append(args, *params.DurationSeconds)
+		duration := int32(*params.DurationSeconds)
+		columns = append(columns, Recordings.DurationSeconds)
+		values[Recordings.DurationSeconds] = &duration
 	}
 	if params.FileSizeBytes != nil {
-		updates = append(updates, "file_size_bytes = ?")
-		args = append(args, *params.FileSizeBytes)
+		fileSize := int32(*params.FileSizeBytes)
+		columns = append(columns, Recordings.FileSizeBytes)
+		values[Recordings.FileSizeBytes] = &fileSize
 	}
 	if params.Status != nil {
-		updates = append(updates, "status = ?")
-		args = append(args, *params.Status)
+		columns = append(columns, Recordings.Status)
+		values[Recordings.Status] = *params.Status
 	}
 	if params.CompletedAt != nil {
-		updates = append(updates, "completed_at = ?")
-		args = append(args, *params.CompletedAt)
+		columns = append(columns, Recordings.CompletedAt)
+		values[Recordings.CompletedAt] = params.CompletedAt
 	}
 	if params.TranscriptionStatus != nil {
-		updates = append(updates, "transcription_status = ?")
-		args = append(args, *params.TranscriptionStatus)
+		columns = append(columns, Recordings.TranscriptionStatus)
+		values[Recordings.TranscriptionStatus] = params.TranscriptionStatus
 	}
 	if params.Notes != nil {
-		updates = append(updates, "notes = ?")
-		args = append(args, *params.Notes)
+		columns = append(columns, Recordings.Notes)
+		values[Recordings.Notes] = params.Notes
 	}
 
-	if len(updates) == 0 {
+	if len(columns) == 0 {
 		return fmt.Errorf("no fields to update")
 	}
 
-	query += updates[0]
-	for i := 1; i < len(updates); i++ {
-		query += ", " + updates[i]
-	}
-	query += " WHERE id = ?"
-	args = append(args, id)
+	stmt := Recordings.
+		UPDATE(columns).
+		MODEL(values).
+		WHERE(Recordings.ID.EQ(Int32(int32(id))))
 
-	result, err := r.db.Exec(query, args...)
+	_, err := stmt.Exec(r.db.DB)
 	if err != nil {
 		return fmt.Errorf("failed to update recording: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("recording not found")
 	}
 
 	return nil
@@ -259,7 +152,11 @@ func (r *RecordingRepository) Update(id int64, params models.UpdateRecordingPara
 
 // Delete deletes a recording
 func (r *RecordingRepository) Delete(id int64) error {
-	result, err := r.db.Exec("DELETE FROM recordings WHERE id = ?", id)
+	stmt := Recordings.
+		DELETE().
+		WHERE(Recordings.ID.EQ(Int32(int32(id))))
+
+	result, err := stmt.Exec(r.db.DB)
 	if err != nil {
 		return fmt.Errorf("failed to delete recording: %w", err)
 	}
@@ -286,4 +183,41 @@ func (r *RecordingRepository) MarkCompleted(id int64, duration int, fileSize int
 		Status:          &status,
 		CompletedAt:     &now,
 	})
+}
+
+// Helper function to convert Jet model to our domain model
+func jetModelToRecording(m *model.Recordings) *models.Recording {
+	rec := &models.Recording{
+		ID:                  int64(*m.ID),
+		FileID:              m.FileID,
+		Filename:            m.Filename,
+		FilePath:            m.FilePath,
+		DurationSeconds:     0,
+		FileSizeBytes:       0,
+		Status:              m.Status,
+		CreatedAt:           m.CreatedAt,
+		TranscriptionStatus: "pending",
+	}
+
+	if m.SessionID != nil {
+		sessionID := int64(*m.SessionID)
+		rec.SessionID = &sessionID
+	}
+	if m.DurationSeconds != nil {
+		rec.DurationSeconds = int(*m.DurationSeconds)
+	}
+	if m.FileSizeBytes != nil {
+		rec.FileSizeBytes = int64(*m.FileSizeBytes)
+	}
+	if m.CompletedAt != nil {
+		rec.CompletedAt = m.CompletedAt
+	}
+	if m.TranscriptionStatus != nil {
+		rec.TranscriptionStatus = *m.TranscriptionStatus
+	}
+	if m.Notes != nil {
+		rec.Notes = m.Notes
+	}
+
+	return rec
 }
