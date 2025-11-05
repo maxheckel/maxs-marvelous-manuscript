@@ -374,3 +374,31 @@ func writeUint16(b []byte, v uint16) {
 	b[0] = byte(v)
 	b[1] = byte(v >> 8)
 }
+
+// GetCurrentFile returns the path of the current recording file
+func (r *Recorder) GetCurrentFile() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if r.currentFile == nil {
+		return ""
+	}
+	return r.currentFile.Name()
+}
+
+// GetFileSize returns the current size of the recording file in bytes
+func (r *Recorder) GetFileSize() int64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if r.currentFile == nil {
+		return 0
+	}
+
+	fileInfo, err := r.currentFile.Stat()
+	if err != nil {
+		return 0
+	}
+
+	return fileInfo.Size()
+}

@@ -5,6 +5,7 @@ A D&D session recording and analysis assistant that runs on your local device (l
 ## Features
 
 - **Audio Recording**: Record long D&D sessions with optimized audio quality (16kHz mono) to save space
+- **Graphical Recorder UI**: Fullscreen GUI with pause/stop buttons, real-time duration display, and file size tracking
 - **Session Management**: Store and manage multiple recording sessions in a local SQLite database
 - **Web Interface**: Vue 3 TypeScript frontend for viewing and managing recordings
 - **AI Integration**: Interfaces for transcription (Whisper), speaker diarization, session summarization, and embeddings
@@ -34,8 +35,13 @@ A D&D session recording and analysis assistant that runs on your local device (l
 ## Prerequisites
 
 - Go 1.25.1 or later
-- Node.js 18+ and npm
+- Node.js 18+ and npm (only needed for web interface development)
 - SQLite3 (usually comes pre-installed)
+- For the GUI recorder: OpenGL libraries (usually pre-installed on modern systems)
+  - **Raspberry Pi OS**: `sudo apt-get install libgl1-mesa-dev xorg-dev libasound2-dev`
+  - **Linux**: `libgl1-mesa-dev` and `xorg-dev`
+  - **macOS**: Comes pre-installed with Xcode Command Line Tools
+  - **Windows**: Comes pre-installed
 
 ## Installation
 
@@ -83,21 +89,106 @@ For development with hot reload:
 npm run dev
 ```
 
+### Raspberry Pi Setup
+
+For running the recorder on a Raspberry Pi with a small touchscreen:
+
+1. Install system dependencies:
+```bash
+sudo apt-get update
+sudo apt-get install -y libgl1-mesa-dev xorg-dev libasound2-dev
+```
+
+2. Install Go 1.25+ (if not already installed):
+```bash
+wget https://go.dev/dl/go1.25.1.linux-arm64.tar.gz  # or armv7l for 32-bit
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.25.1.linux-arm64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+source ~/.bashrc
+```
+
+3. Build the recorder (only the recorder is needed for Pi):
+```bash
+git clone <repository-url>
+cd maxs-marvelous-manuscript
+go mod download
+go build -o bin/recorder ./cmd/recorder
+```
+
+4. Run the recorder (adjust scale for your screen size):
+```bash
+# For 3.5" screens, use larger scale
+FYNE_SCALE=2.0 ./bin/recorder
+
+# For 5-7" screens, use default
+./bin/recorder
+```
+
+5. Optional - Auto-start on boot:
+Create `/etc/systemd/system/dnd-recorder.service`:
+```ini
+[Unit]
+Description=D&D Session Recorder
+After=graphical.target
+
+[Service]
+Type=simple
+User=pi
+Environment="DISPLAY=:0"
+Environment="FYNE_SCALE=1.5"
+WorkingDirectory=/home/pi/maxs-marvelous-manuscript
+ExecStart=/home/pi/maxs-marvelous-manuscript/bin/recorder
+Restart=on-failure
+
+[Install]
+WantedBy=graphical.target
+```
+
+Then enable it:
+```bash
+sudo systemctl enable dnd-recorder
+sudo systemctl start dnd-recorder
+```
+
 ## Usage
 
 ### Recording a Session
 
-Start the recording CLI application:
+Start the recorder GUI application:
 
 ```bash
 ./bin/recorder
 ```
 
-Controls:
-- The recorder starts automatically
-- Press `Ctrl+C` to stop recording
+The application will open in fullscreen mode with:
+- **Status Display**: Shows current state (Recording/Paused/Stopped)
+- **Duration Counter**: Real-time display of recording duration
+- **File Info**: Current filename and file size
+- **Pause Button**: Toggle between recording and paused states (highlighted in blue)
+- **Stop Button**: Stop recording and save to database (highlighted in red)
 
-The audio file will be saved to the `data/` directory with metadata stored in the database.
+The recorder starts automatically when launched. The audio file will be saved to the `data/` directory with metadata stored in the database.
+
+#### Raspberry Pi & Small Screens
+
+The UI is optimized for small touchscreens (3.5" - 7") commonly used with Raspberry Pi:
+- Automatically scales UI elements (default 1.3x for better readability)
+- Large, touch-friendly buttons
+- Compact layout that fits small displays
+- Reduced CPU usage (updates 4 times per second instead of 10)
+
+To adjust UI scale for your screen size:
+```bash
+# Make UI larger for very small screens (e.g., 3.5" display)
+FYNE_SCALE=2.0 ./bin/recorder
+
+# Default scaling (recommended for 5-7" screens)
+./bin/recorder
+
+# Smaller UI for larger screens
+FYNE_SCALE=1.0 ./bin/recorder
+```
 
 ### Web Interface
 
@@ -142,8 +233,9 @@ export AUDIO_BIT_DEPTH="16"           # 16-bit
 ### Two Entry Points
 
 1. **Recorder Application** (`cmd/recorder/main.go`)
-   - CLI application for recording audio
-   - Simple terminal UI showing recording status
+   - Fullscreen GUI application using Fyne framework
+   - Real-time display of recording status, duration, and file size
+   - Pause/Resume and Stop buttons for control
    - Saves files and creates database records
 
 2. **Web Application** (`cmd/web/main.go`)
@@ -241,6 +333,7 @@ This will:
 ### Completed ✅
 - [x] Real-time audio capture with malgo
 - [x] Pause/resume functionality
+- [x] Fullscreen GUI with Fyne (pause/stop buttons)
 - [x] Campaign and session management
 - [x] Player tracking and attendance
 - [x] Type-safe database queries with Jet
@@ -271,6 +364,7 @@ This is a personal project, but suggestions and contributions are welcome!
 
 - Audio files are optimized for long sessions: approximately **115 MB per hour** at 16kHz, mono, 16-bit.
 - **Audio recording is fully implemented** using malgo for cross-platform capture.
+- **GUI recorder** uses Fyne for a native, fullscreen interface with pause/stop buttons.
 - Ensure your system has a working microphone/audio input device.
 - AI features require API keys and may incur costs (OpenAI API).
 - This runs entirely locally except for AI API calls.

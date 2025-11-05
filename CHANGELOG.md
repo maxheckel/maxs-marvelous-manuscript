@@ -10,6 +10,19 @@
   - Pause/resume functionality
   - Approximately 115 MB per hour of recording
   - Thread-safe state management
+- **Graphical User Interface**: Fullscreen recorder UI using Fyne
+  - Real-time recording status display
+  - Duration counter with hours:minutes:seconds
+  - Current file name and size display
+  - Pause/Resume button with visual state changes (blue highlight)
+  - Stop button with graceful shutdown (red highlight)
+  - Auto-updates every 250ms for smooth UI with low CPU usage
+  - Fullscreen mode for distraction-free recording
+  - **Optimized for Small Screens**: Perfect for Raspberry Pi with 3.5" - 7" touchscreens
+    - Large, touch-friendly buttons
+    - Compact border layout that maximizes usable space
+    - Configurable UI scaling (default 1.3x, adjustable via FYNE_SCALE)
+    - Bold text for critical information (status and duration)
 - **Campaign Management**: Track D&D campaigns with name, description, and timestamps
 - **Session Management**: Record individual game sessions within campaigns
   - Session number tracking
